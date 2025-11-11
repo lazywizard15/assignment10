@@ -112,6 +112,26 @@ def setup_test_database(request):
     - Optionally initialize the database with seed data.
     After tests, drop all tables unless --preserve-db is set.
     """
+    # --- RETRY LOGIC START ---
+    max_retries = 10
+    retry_delay = 1
+    
+    # Attempt connection/wait for DB readiness
+    for i in range(max_retries):
+        try:
+            # Try connecting to the engine and executing a simple query
+            with test_engine.connect() as connection:
+                connection.execute(text("SELECT 1")) 
+                logger.info("Database container connection successful. Proceeding with setup.")
+                break
+        except SQLAlchemyError as e:
+            if i < max_retries - 1:
+                logger.warning(f"DB connection failed (Attempt {i+1}/{max_retries}). Retrying in {retry_delay}s. Error: {e.orig.__class__.__name__}")
+                time.sleep(retry_delay)
+            else:
+                logger.error(f"Failed to connect to the database after {max_retries} attempts.")
+                raise # Re-raise the exception if retries are exhausted
+    # --- RETRY LOGIC END ---
     logger.info("Setting up test database...")
 
     # Drop all tables to ensure a clean slate
